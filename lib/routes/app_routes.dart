@@ -10,4 +10,5 @@ class AppRoutes {
     main: (context) => const MainScreen(),
     details: (context) => const DetailPage(),
   };
+  
 }
