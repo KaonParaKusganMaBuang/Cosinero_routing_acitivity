@@ -1,30 +1,54 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:routing/main.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:routing/pages/sample_page.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Sample page loads API items and removes one on delete', (
+    tester,
+  ) async {
+    final posts = [
+      {'id': 1, 'title': 'First item', 'body': 'Body text'},
+      {'id': 2, 'title': 'Second item', 'body': 'Body text 2'},
+    ];
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final mockClient = MockClient((request) async {
+      if (request.method == 'GET') {
+        return http.Response(
+          jsonEncode(posts),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      if (request.method == 'DELETE') {
+        posts.removeWhere(
+          (item) => item['id'].toString() == request.url.pathSegments.last,
+        );
+        return http.Response(
+          '',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      return http.Response('', 500);
+    });
+
+    await tester.pumpWidget(MaterialApp(home: SamplePage(client: mockClient)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('First item'), findsOneWidget);
+    expect(find.text('Second item'), findsOneWidget);
+    expect(find.byType(ElevatedButton), findsNWidgets(2));
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('First item'), findsNothing);
+    expect(find.text('Second item'), findsOneWidget);
   });
 }
